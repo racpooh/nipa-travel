@@ -6,7 +6,7 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
-d
+    
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}  # Replace with your Docker Hub username if needed
 
