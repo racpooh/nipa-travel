@@ -29,10 +29,11 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_BASE_URL=http://nipa-backend:5003
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:5003/api
       - NEXT_PUBLIC_API_VERSION=v1
       - NEXT_PUBLIC_APP_NAME=NIPA Frontend
       - NEXT_PUBLIC_APP_VERSION=1.0.0
+      - NODE_ENV=production
     depends_on:
       backend:
         condition: service_healthy

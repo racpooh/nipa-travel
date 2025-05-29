@@ -22,7 +22,6 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -61,7 +60,6 @@ app.get('/health', (req, res) => {
 });
 
 // Test database route
-// Add this route in your server.js (after the /health route)
 app.get('/api/check-tables', async (req, res) => {
   try {
     const { pool } = require('./config/db');
@@ -99,13 +97,38 @@ app.get('/api/check-tables', async (req, res) => {
   }
 });
 
+// Handle malformed URLs from frontend - ADD THIS SECTION HERE
+app.use('/api/auth/login:1', (req, res, next) => {
+  console.log('Handling malformed URL: /api/auth/login:1');
+  req.url = '/api/auth/login';
+  req.originalUrl = '/api/auth/login';
+  next();
+});
+
+app.use('/api/auth/login1', (req, res, next) => {
+  console.log('Handling malformed URL: /api/auth/login1');
+  req.url = '/api/auth/login';
+  req.originalUrl = '/api/auth/login';
+  next();
+});
+
+// Handle any other malformed auth URLs
+app.use('/api/auth/*:*', (req, res, next) => {
+  console.log('Handling malformed auth URL:', req.originalUrl);
+  // Remove the :1 or similar suffixes
+  const cleanUrl = req.originalUrl.replace(/:[\d]+$/, '');
+  req.url = cleanUrl;
+  req.originalUrl = cleanUrl;
+  next();
+});
+
 // User authentication routes
 app.use('/api/auth', require('./routes/auth'));
 
 // Bookings routes
 app.use('/api/bookings', require('./routes/bookings'));
 
-// Add this line after your booking routes
+// Weather routes
 app.use('/api/weather', require('./routes/weather'));
 
 // Error handling middleware
