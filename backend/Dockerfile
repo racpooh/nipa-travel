@@ -1,35 +1,35 @@
-# Use Node.js 18 Alpine for smaller image size
+# Use the official Node.js runtime as the base image
 FROM node:18-alpine
 
-# Set working directory
+# Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies for better performance
-RUN apk add --no-cache libc6-compat
+# Install curl for health checks
+RUN apk add --no-cache curl
 
-# Copy package files
-COPY package.json package-lock.json* ./
+# Copy package.json and package-lock.json (if available)
+COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production
 
-# Copy source code
+# Copy the rest of the application code
 COPY . .
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nodejs
+# Create a non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodeuser -u 1001
 
 # Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
-USER nodejs
+RUN chown -R nodeuser:nodejs /app
+USER nodeuser
 
-# Expose port
+# Expose the port the app runs on
 EXPOSE 5003
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5003/health || exit 1
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:5003/ || exit 1
 
-# Start the application
+# Define the command to run the application
 CMD ["npm", "start"]
