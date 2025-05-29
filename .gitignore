@@ -1,0 +1,35 @@
+# Root level ignores
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.staging
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# OS generated files
+*.pid
+*.seed
+*.lock
+
+# Kubernetes secrets (if you add them later)
+k8s/secrets/
