@@ -1,55 +1,45 @@
-version: '3.8'
-
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: mcowl/nipa-travel-backend:latest
+    container_name: nipa-backend
     ports:
       - "5003:5003"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - PORT=5003
-      - DB_HOST=host.docker.internal
+      - DB_HOST=183.90.173.149
       - DB_PORT=3306
       - DB_USER=db-user
       - DB_PASSWORD=Kurifatto300#
       - DB_NAME=DB-Default
-      - JWT_SECRET=your_jwt_secret_here
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
+      - JWT_SECRET=asdfghjkl;;lkjhgfdsa
+      - JWT_EXPIRES_IN=7d
     networks:
-      - nipa-travel-network
+      - nipa-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 3
 
   frontend:
-    build:
-      context: ./nipa-travel-frontend
-      dockerfile: Dockerfile
+    image: mcowl/nipa-travel-frontend:latest
+    container_name: nipa-frontend
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:5003
-    volumes:
-      - ./nipa-travel-frontend:/app
-      - /app/node_modules
-      - /app/.next
+      - NEXT_PUBLIC_API_BASE_URL=http://nipa-backend:5003
+      - NEXT_PUBLIC_API_VERSION=v1
+      - NEXT_PUBLIC_APP_NAME=NIPA Frontend
+      - NEXT_PUBLIC_APP_VERSION=1.0.0
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
-      - nipa-travel-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - nipa-network
+    restart: unless-stopped
 
 networks:
-  nipa-travel-network:
+  nipa-network:
     driver: bridge
