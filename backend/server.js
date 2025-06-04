@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 
 // Load environment variables
-dotenv.config({ path: './config/config.env' });
+dotenv.config({ path: './.env' });
 
 // Import database functions
 const { testConnection } = require('./config/db');
@@ -11,6 +11,14 @@ const { createTables } = require('./config/createTable');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+console.log(process.env.PORT);
+
+if (process.env.PORT) {
+  console.log('PORT is set');
+} else {
+  console.log('PORT is not set');
+}
 
 const corsOptions = {
   origin: [
