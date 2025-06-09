@@ -72,12 +72,12 @@ jobs:
         if [[ $GITHUB_REF == refs/tags/* ]]; then
           VERSION=${GITHUB_REF#refs/tags/}
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "TAGS=$DOCKERHUB_USERNAME/nipa-travel-backend:$VERSION,$DOCKERHUB_USERNAME/nipa-travel-backend:latest" >> $GITHUB_OUTPUT
-          echo "FRONTEND_TAGS=$DOCKERHUB_USERNAME/nipa-travel-frontend:$VERSION,$DOCKERHUB_USERNAME/nipa-travel-frontend:latest" >> $GITHUB_OUTPUT
+          echo "TAGS=$DOCKERHUB_USERNAME/nipa-travel-backend:$VERSION,$DOCKERHUB_USERNAME/nipa-travel-backend:v123" >> $GITHUB_OUTPUT
+          echo "FRONTEND_TAGS=$DOCKERHUB_USERNAME/nipa-travel-frontend:$VERSION,$DOCKERHUB_USERNAME/nipa-travel-frontend:v123" >> $GITHUB_OUTPUT
         elif [[ $GITHUB_REF == refs/heads/main ]]; then
-          echo "VERSION=latest" >> $GITHUB_OUTPUT
-          echo "TAGS=$DOCKERHUB_USERNAME/nipa-travel-backend:latest" >> $GITHUB_OUTPUT
-          echo "FRONTEND_TAGS=$DOCKERHUB_USERNAME/nipa-travel-frontend:latest" >> $GITHUB_OUTPUT
+          echo "VERSION=v123" >> $GITHUB_OUTPUT
+          echo "TAGS=$DOCKERHUB_USERNAME/nipa-travel-backend:v123" >> $GITHUB_OUTPUT
+          echo "FRONTEND_TAGS=$DOCKERHUB_USERNAME/nipa-travel-frontend:v123" >> $GITHUB_OUTPUT
         else
           BRANCH=${GITHUB_REF#refs/heads/}
           echo "VERSION=$BRANCH" >> $GITHUB_OUTPUT
