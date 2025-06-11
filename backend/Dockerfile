@@ -1,5 +1,5 @@
 # backend/Dockerfile
-FROM node:18-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -16,6 +16,6 @@ RUN adduser --system --uid 1001 expressjs
 USER expressjs
 
 EXPOSE 8000
-ENV PORT 8000
+ENV PORT=8000
 
 CMD ["node", "server.js"]
