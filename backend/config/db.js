@@ -7,7 +7,13 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 10
+  connectionLimit: 100,          // ← Much better!
+  acquireTimeout: 20000,         
+  timeout: 30000,                
+  queueLimit: 0,                 
+  reconnect: true,               
+  idleTimeout: 300000,           
+  maxIdle: 20                    // Keep some idle connections
 };
 
 const pool = mysql.createPool(dbConfig);
