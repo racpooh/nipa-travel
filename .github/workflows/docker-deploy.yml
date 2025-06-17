@@ -1,5 +1,10 @@
 name: Build and Deploy to Docker Hub
 
+# 1. Cancel stale runs on the same ref
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main, develop]
@@ -13,124 +18,105 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
+    # 2. Cache npm across runs
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: |
-          backend/package-lock.json
-          frontend/package-lock.json
+      - name: Set up Node.js (v18)
+        uses: actions/setup-node@v4 # pinned minor
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
-    - name: Install backend dependencies
-      run: |
-        cd backend
-        npm ci
+      - name: Restore additional npm cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
-    - name: Install frontend dependencies
-      run: |
-        cd frontend
-        npm ci
+      - name: Install backend deps & test
+        run: |
+          cd backend
+          npm ci
+          npm run test --if-present || echo "No backend tests"
 
-    - name: Run backend tests
-      run: |
-        cd backend
-        npm run test --if-present || echo "No backend tests found, skipping..."
-
-    - name: Run frontend tests
-      run: |
-        cd frontend
-        npm run test --if-present || echo "No frontend tests found, skipping..."
+      - name: Install frontend deps & test
+        run: |
+          cd frontend
+          npm ci
+          npm run test --if-present || echo "No frontend tests"
 
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' 
-    
+    if: github.event_name == 'push'
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3 # pinned minor
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Extract metadata
-      id: meta
-      run: |
-        # Generate tags based on branch/tag
-        if [[ $GITHUB_REF == refs/tags/* ]]; then
-          VERSION=${GITHUB_REF#refs/tags/}
+      - name: Extract metadata
+        id: meta
+        run: |
+          # branch vs tag → VERSION & TAG lists
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          elif [[ $GITHUB_REF == refs/heads/main ]]; then
+            VERSION=latest
+          else
+            VERSION=${GITHUB_REF#refs/heads/}
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "TAGS=$DOCKERHUB_USERNAME/nipa-travel-backend:$VERSION,$DOCKERHUB_USERNAME/nipa-travel-backend:v123" >> $GITHUB_OUTPUT
-          echo "FRONTEND_TAGS=$DOCKERHUB_USERNAME/nipa-travel-frontend:$VERSION,$DOCKERHUB_USERNAME/nipa-travel-frontend:v123" >> $GITHUB_OUTPUT
-        elif [[ $GITHUB_REF == refs/heads/main ]]; then
-          echo "VERSION=v123" >> $GITHUB_OUTPUT
-          echo "TAGS=$DOCKERHUB_USERNAME/nipa-travel-backend:v123" >> $GITHUB_OUTPUT
-          echo "FRONTEND_TAGS=$DOCKERHUB_USERNAME/nipa-travel-frontend:v123" >> $GITHUB_OUTPUT
-        else
-          BRANCH=${GITHUB_REF#refs/heads/}
-          echo "VERSION=$BRANCH" >> $GITHUB_OUTPUT
-          echo "TAGS=$DOCKERHUB_USERNAME/nipa-travel-backend:$BRANCH" >> $GITHUB_OUTPUT
-          echo "FRONTEND_TAGS=$DOCKERHUB_USERNAME/nipa-travel-frontend:$BRANCH" >> $GITHUB_OUTPUT
-        fi
+          echo "TAGS=$DOCKERHUB_USERNAME/nipa-travel-backend:$VERSION,$DOCKERHUB_USERNAME/nipa-travel-backend:latest" >> $GITHUB_OUTPUT
+          echo "FRONTEND_TAGS=$DOCKERHUB_USERNAME/nipa-travel-frontend:$VERSION,$DOCKERHUB_USERNAME/nipa-travel-frontend:latest" >> $GITHUB_OUTPUT
 
-    - name: Build and push Backend
-      uses: docker/build-push-action@v5
-      with:
-        context: ./backend
-        push: true
-        platforms: linux/amd64,linux/arm64
-        tags: ${{ steps.meta.outputs.TAGS }}
-        labels: |
-          org.opencontainers.image.title=NIPA Travel Backend
-          org.opencontainers.image.description=Node.js API for NIPA Travel Application
-          org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          org.opencontainers.image.revision=${{ github.sha }}
+      - name: Build & push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.TAGS }}
+          # 3. Reuse layers to speed up subsequent builds
+          cache-from: type=registry,ref=${{ steps.meta.outputs.TAGS }}  
+          cache-to:   type=registry,ref=${{ steps.meta.outputs.TAGS }},mode=max
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
-    - name: Build and push Frontend
-      uses: docker/build-push-action@v5
-      with:
-        context: ./frontend
-        push: true
-        platforms: linux/amd64,linux/arm64
-        tags: ${{ steps.meta.outputs.FRONTEND_TAGS }}
-        labels: |
-          org.opencontainers.image.title=NIPA Travel Frontend
-          org.opencontainers.image.description=Next.js web application for NIPA Travel
-          org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          org.opencontainers.image.revision=${{ github.sha }}
+      - name: Build & push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.FRONTEND_TAGS }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.FRONTEND_TAGS }}
+          cache-to:   type=registry,ref=${{ steps.meta.outputs.FRONTEND_TAGS }},mode=max
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
-    - name: Image digest and summary
-      run: |
-        echo "## 🐳 Docker Images Built Successfully!" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Backend Image:" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "docker pull $DOCKERHUB_USERNAME/nipa-travel-backend:${{ steps.meta.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Frontend Image:" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "docker pull $DOCKERHUB_USERNAME/nipa-travel-frontend:${{ steps.meta.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🚀 Ready for deployment!" >> $GITHUB_STEP_SUMMARY
-        echo "Your friend can now pull these images and run:" >> $GITHUB_STEP_SUMMARY
-        echo '```bash' >> $GITHUB_STEP_SUMMARY
-        echo "# Backend" >> $GITHUB_STEP_SUMMARY
-        echo "docker run -p 5003:5003 $DOCKERHUB_USERNAME/nipa-travel-backend:${{ steps.meta.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "# Frontend" >> $GITHUB_STEP_SUMMARY
-        echo "docker run -p 3000:3000 $DOCKERHUB_USERNAME/nipa-travel-frontend:${{ steps.meta.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: Docker image summary
+        run: |
+          {
+            echo "## 🐳 Docker Images Built"
+            echo "- Backend: $DOCKERHUB_USERNAME/nipa-travel-backend:${{ steps.meta.outputs.VERSION }}"
+            echo "- Frontend: $DOCKERHUB_USERNAME/nipa-travel-frontend:${{ steps.meta.outputs.VERSION }}"
+          } >> $GITHUB_STEP_SUMMARY
