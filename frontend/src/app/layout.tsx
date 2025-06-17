@@ -4,7 +4,10 @@ import './globals.css';
 import { AuthProvider } from '@/libs/auth-context';
 import Header from '@/components/header';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ 
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
   title: 'NIPA Trip - Thailand Travel Booking',
@@ -18,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="scroll-smooth">
-      <body className={inter.className}>
+      <body className={inter.variable}>
         <AuthProvider>
           <div className="min-h-screen flex flex-col">
             <Header />

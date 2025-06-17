@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
   // Environment variables that should be available at build time
   env: {
     // Add your environment variables here
+    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://k8s-test.sudlor.me',
   },
   
   // If you're using images, configure domains

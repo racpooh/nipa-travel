@@ -84,6 +84,8 @@ const register = async (req, res) => {
       }
     });
 
+    console.log(`${username} registered successfully`);
+
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({

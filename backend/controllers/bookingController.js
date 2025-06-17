@@ -54,7 +54,7 @@ const createBooking = async (req, res) => {
     let weatherPrediction = null;
     if (destination_latitude && destination_longitude && departure_date) {
       try {
-        const { predictWeather } = require('../utils/weatherAI');
+        const { predictWeather } = require('../utils/weather');
         weatherPrediction = predictWeather(
           destination_latitude, 
           destination_longitude, 
