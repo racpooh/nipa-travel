@@ -12,9 +12,6 @@ const dbConfig = {
   connectionLimit: 25,              // Reduced from 100 - more realistic
   queueLimit: 0,                    // Keep this
   
-  // Timeout settings (corrected names)
-  acquireTimeout: 60000,            // Time to wait for connection from pool
-  timeout: 60000,                   // Query timeout
   
   // Connection management
   idleTimeout: 300000,              // 5 minutes

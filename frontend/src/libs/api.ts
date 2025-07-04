@@ -115,6 +115,7 @@ class ApiClient {
 
   async getAllBookings(): Promise<BookingResponse> {
     const response: AxiosResponse<BookingResponse> = await this.api.get('/api/bookings/all');
+    console.log(response);
     return response.data;
   }
 
@@ -130,6 +131,22 @@ class ApiClient {
 
   async deleteBooking(id: number): Promise<ApiResponse> {
     const response: AxiosResponse<ApiResponse> = await this.api.delete(`/api/bookings/${id}`);
+    return response.data;
+  }
+
+  async deleteAllBookings(): Promise<ApiResponse> {
+    const response: AxiosResponse<ApiResponse> = await this.api.delete('/api/bookings/all');
+    return response.data;
+  }
+
+  async getUserBookingsPaginated(page = 1, limit = 100): Promise<BookingResponse> {
+    const response: AxiosResponse<BookingResponse> = await this.api.get('/api/bookings', { params: { page, limit } });
+    return response.data;
+  }
+
+  async getAllBookingsPaginated(page = 1, limit = 100): Promise<BookingResponse> {
+    const response: AxiosResponse<BookingResponse> = await this.api.get('/api/bookings/all', { params: { page, limit } });
+    console.log(response);
     return response.data;
   }
 

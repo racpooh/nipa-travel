@@ -6,7 +6,8 @@ const {
   getAllBookings,
   getBookingById,
   updateBooking,
-  deleteBooking
+  deleteBooking,
+  deleteAllBookings
 } = require('../controllers/bookingController');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
@@ -34,6 +35,12 @@ router.get('/:id', authenticateToken, getBookingById);
 // @desc    Update booking
 // @access  Private (Own booking or Admin)
 router.put('/:id', authenticateToken, updateBooking);
+
+
+// @route   DELETE /api/bookings/all
+// @desc    Delete all bookings (Admin only)
+// @access  Private (Admin)
+router.delete('/all', authenticateToken, requireAdmin, deleteAllBookings);
 
 // @route   DELETE /api/bookings/:id
 // @desc    Delete booking

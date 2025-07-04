@@ -66,8 +66,13 @@ export interface BookingResponse {
   data: {
     booking?: Booking;
     bookings?: Booking[];
-    total_bookings?: number;
-    weather_prediction?: WeatherPrediction;
+    total_bookings: number;
+    limit: number; // Number of bookings per page
+    page: number; // Current page number
+    total_pending: number;
+    total_cancelled: number; // Placeholder for future use
+    total_confirmed: number; // Placeholder for future use
+    weather_prediction: WeatherPrediction;
     requires_weather_confirmation?: boolean;
   };
 }

@@ -103,37 +103,36 @@ const createBooking = async (req, res) => {
   }
 };
 
-// Get user's bookings (FIXED VERSION)
+// Get user's bookings (with pagination)
 const getUserBookings = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    console.log('Getting bookings for user:', req.user.id);
+    // Get total count
+    const [countRows] = await pool.execute(
+      'SELECT COUNT(*) as count FROM bookings WHERE user_id = ?',
+      [req.user.id]
+    );
+    const total_bookings = countRows[0].count;
 
-    // Simple query without complex pagination first
-    const [bookings] = await pool.execute(`
-      SELECT 
-        b.*,
-        u.username
-      FROM bookings b
-      JOIN users u ON b.user_id = u.id
-      WHERE b.user_id = ?
-      ORDER BY b.created_at DESC
-    `, [req.user.id]);
-
-    console.log('Found bookings:', bookings.length);
+    // Get paginated bookings
+    const [bookings] = await pool.execute(
+      `SELECT b.*, u.username FROM bookings b JOIN users u ON b.user_id = u.id WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT ? OFFSET ?`,
+      [req.user.id, limit, offset]
+    );
 
     res.json({
       message: bookings.length > 0 ? 'User bookings retrieved successfully' : 'No bookings found',
       success: true,
       data: {
-        bookings: bookings,
-        total_bookings: bookings.length
+        bookings,
+        total_bookings,
+        page,
+        limit
       }
     });
-
   } catch (error) {
     console.error('Get user bookings error:', error);
     res.status(500).json({
@@ -144,65 +143,82 @@ const getUserBookings = async (req, res) => {
   }
 };
 
-// Get all bookings (Admin only) - FIXED VERSION
+// Get all bookings (Admin only, with pagination)
 const getAllBookings = async (req, res) => {
   try {
-    console.log('Admin getting all bookings. Admin user:', req.user.username);
-
+    const page = String(req.query.page || "1");
+    const limit = String(req.query.limit || "10");
+    const offset = String((page - 1) * limit);
     const status = req.query.status; // Optional filter by status
 
+    console.log(`Get all bookings request - Page: ${page}, Limit: ${limit}, Offset: ${offset}, Status: ${status}`);
+    // --- Part 1: Get Total Count (Corrected for clarity) ---
+    // This part of your code was likely correct, but we'll make it clearer.
+    let countQuery = 'SELECT COUNT(*) as count FROM bookings';
+    const totalPendingQuery = 'SELECT COUNT(*) as count FROM bookings WHERE booking_status = "pending"';
+    const totalCancelledQuery = 'SELECT COUNT(*) as count FROM bookings WHERE booking_status = "cancelled"';
+    const totalConfirmedQuery = 'SELECT COUNT(*) as count FROM bookings WHERE booking_status = "confirmed"';
+    const countParams = [];
+    if (status) {
+      countQuery += ' WHERE booking_status = ?';
+      countParams.push(status);
+    }
+    const [countRows] = await pool.execute(countQuery, countParams);
+    const total_bookings = countRows[0].count;
+
+    // Get total counts for pending and cancelled bookings
+    const [totalPendingRows] = await pool.execute(totalPendingQuery);
+    const [totalCancelledRows] = await pool.execute(totalCancelledQuery);
+    const total_pending = totalPendingRows[0].count;
+    const total_cancelled = totalCancelledRows[0].count;
+    const [totalConfirmedRows] = await pool.execute(totalConfirmedQuery);
+    const total_confirmed = totalConfirmedRows[0].count;
+
+    // --- Part 2: Get Paginated Bookings (Refactored Logic) ---
+    // Start with the base query that is always the same.
     let query = `
       SELECT 
-        b.id,
-        b.departure_location,
-        b.destination_location,
-        b.departure_latitude,
-        b.departure_longitude,
-        b.destination_latitude,
-        b.destination_longitude,
-        b.flight_number,
-        b.departure_date,
-        b.departure_time,
-        b.arrival_date,
-        b.arrival_time,
-        b.seat_number,
-        b.gate_number,
-        b.ticket_price,
-        b.weather_forecast,
-        b.weather_confirmed,
-        b.booking_status,
-        b.created_at,
-        b.updated_at,
-        u.username,
-        u.email
-      FROM bookings b
+        b.id, b.departure_location, b.destination_location, b.departure_latitude, 
+        b.departure_longitude, b.destination_latitude, b.destination_longitude, 
+        b.flight_number, b.departure_date, b.departure_time, b.arrival_date, 
+        b.arrival_time, b.seat_number, b.gate_number, b.ticket_price, 
+        b.weather_forecast, b.weather_confirmed, b.booking_status, b.created_at, 
+        b.updated_at, u.username, u.email 
+      FROM bookings b 
       JOIN users u ON b.user_id = u.id
     `;
-    
-    let queryParams = [];
+    const queryParams = [];
 
-    // Filter by status if provided
+    // Conditionally add the WHERE clause to both the query and parameters.
     if (status) {
       query += ' WHERE b.booking_status = ?';
       queryParams.push(status);
     }
 
-    query += ' ORDER BY b.created_at DESC';
+    // Add the final parts of the query that are always present.
+    query += ' ORDER BY b.created_at DESC LIMIT ? OFFSET ?';
 
+    queryParams.push(limit, offset);
+
+    // Now, the query and params are guaranteed to match.
     const [bookings] = await pool.execute(query, queryParams);
-
-    console.log('Found total bookings:', bookings.length);
 
     res.json({
       message: bookings.length > 0 ? 'All bookings retrieved successfully' : 'No bookings found',
       success: true,
       data: {
-        bookings: bookings,
-        total_bookings: bookings.length,
-        filter: status ? { status: status } : null
+        bookings,
+        total_bookings,
+        total_pending,
+        total_cancelled,
+        total_confirmed,
+        page,
+        limit,
+        filter: status ? { status } : null
       }
     });
 
+    console.log(total_bookings);
   } catch (error) {
     console.error('Get all bookings error:', error);
     res.status(500).json({
@@ -459,11 +475,34 @@ const deleteBooking = async (req, res) => {
   }
 };
 
+const deleteAllBookings = async (req, res) => {
+  try {
+    console.log('Delete all bookings request by user:', req.user.username);
+
+    // Delete all bookings
+    await pool.execute('DELETE FROM bookings');
+
+    res.json({
+      message: 'All bookings deleted successfully',
+      success: true
+    });
+
+  } catch (error) {
+    console.error('Delete all bookings error:', error);
+    res.status(500).json({
+      message: 'Failed to delete all bookings',
+      success: false,
+      error: process.env.NODE_ENV === 'development' ? error.message : {}
+    });
+  }
+};
+
 module.exports = {
   createBooking,
   getUserBookings,
   getAllBookings,
   getBookingById,
   updateBooking,
-  deleteBooking
+  deleteBooking,
+  deleteAllBookings
 };

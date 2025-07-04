@@ -27,21 +27,38 @@ function DashboardContent() {
   const { user, isAdmin } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalBookings, setTotalBookings] = useState(0);
+  const [totalConfirmed, setTotalConfirmed] = useState(0);
+  const [totalPending, setTotalPending] = useState(0);
+  const [totalCancelled, setTotalCancelled] = useState(0);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 100;
 
   useEffect(() => {
-    fetchBookings();
+    setBookings([]);
+    setPage(1);
+    setHasMore(true);
+    fetchBookings(1, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
-  const fetchBookings = async () => {
+  const fetchBookings = async (pageToFetch = 1, replace = false) => {
     try {
       setIsLoading(true);
-      const response = isAdmin 
-        ? await apiClient.getAllBookings()
-        : await apiClient.getUserBookings();
-      
+      const response = isAdmin
+        ? await apiClient.getAllBookingsPaginated(pageToFetch, PAGE_SIZE)
+        : await apiClient.getUserBookingsPaginated(pageToFetch, PAGE_SIZE);
       if (response.success) {
-        setBookings(response.data.bookings || []);
+        console.log(response);
+        const newBookings = response.data.bookings || [];
+        setTotalBookings(response.data.total_bookings || 0);
+        setTotalPending(response.data.total_pending || 0);
+        setTotalCancelled(response.data.total_cancelled || 0);
+        setTotalConfirmed(response.data.total_confirmed || 0);
+        setBookings(prev => replace ? newBookings : [...prev, ...newBookings]);
+        setHasMore((response.data.bookings?.length || 0) === PAGE_SIZE);
       } else {
         setError(response.message || 'Failed to fetch bookings');
       }
@@ -51,6 +68,12 @@ function DashboardContent() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchBookings(nextPage);
   };
 
   const handleDeleteBooking = async (bookingId: number) => {
@@ -131,7 +154,7 @@ function DashboardContent() {
               }
             </p>
           </div>
-          <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex space-x-2">
             <Link
               href="/booking/create"
               className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
@@ -139,6 +162,24 @@ function DashboardContent() {
               <Plus className="h-5 w-5 mr-2" />
               Create Booking
             </Link>
+            {isAdmin && (
+              <button
+                onClick={async () => {
+                  if (!window.confirm('Are you sure you want to delete ALL bookings? This cannot be undone.')) return;
+                  try {
+                    await apiClient.deleteAllBookings();
+                    setBookings([]);
+                  } catch (err) {
+                    alert('Failed to delete all bookings');
+                    console.error(err);
+                  }
+                }}
+                className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+              >
+                <Trash2 className="h-5 w-5 mr-2" />
+                Delete All Bookings
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -151,7 +192,7 @@ function DashboardContent() {
               <Plane className="h-8 w-8 text-blue-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{bookings.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{totalBookings}</p>
               </div>
             </div>
           </div>
@@ -161,7 +202,7 @@ function DashboardContent() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Confirmed</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {bookings.filter(b => b.booking_status === 'confirmed').length}
+                  {totalConfirmed}
                 </p>
               </div>
             </div>
@@ -172,7 +213,7 @@ function DashboardContent() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Pending</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {bookings.filter(b => b.booking_status === 'pending').length}
+                  {totalPending}
                 </p>
               </div>
             </div>
@@ -183,7 +224,7 @@ function DashboardContent() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Cancelled</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {bookings.filter(b => b.booking_status === 'cancelled').length}
+                  {totalCancelled}
                 </p>
               </div>
             </div>
@@ -199,7 +240,7 @@ function DashboardContent() {
       )}
 
       {/* Bookings Table */}
-      {bookings.length === 0 ? (
+      {totalBookings === 0 ? (
         <div className="bg-white rounded-lg shadow">
           <div className="text-center py-12">
             <Plane className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -349,6 +390,19 @@ function DashboardContent() {
               </tbody>
             </table>
           </div>
+
+          {/* Load More Button */}
+          {hasMore && totalBookings > 0 && (
+            <div className="flex justify-center my-6">
+              <button
+                onClick={handleLoadMore}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Loading...' : 'Load More'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
