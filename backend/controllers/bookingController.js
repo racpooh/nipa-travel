@@ -106,10 +106,10 @@ const createBooking = async (req, res) => {
 // Get user's bookings (with pagination)
 const getUserBookings = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
-
+    const page = String(req.query.page || "1");
+    const limit = String(req.query.limit || "10");
+    const offset = String((page - 1) * limit);
+    
     // Get total count
     const [countRows] = await pool.execute(
       'SELECT COUNT(*) as count FROM bookings WHERE user_id = ?',
